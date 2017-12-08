@@ -1,21 +1,34 @@
 import sys
 from time import sleep
 import os
+import curses
+import signal
+
+def signal_handler(signal, frame):
+	curses.endwin()
+	sys.exit(0)
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def print_matrix(matrix):
 	for i in range(0, len(matrix)+2):
-		sys.stdout.write("#")
-	print()
+		win.addch("#")
+
 	for row in matrix:
-		sys.stdout.write("#")
+		win.addch("#")
 		for field in row:
-			sys.stdout.write(field)
-		sys.stdout.write("#")
-		print()
-	for i in range(0, len(matrix)+2):
-		sys.stdout.write("#")
-	print()
+			win.addch(field)
+		win.addch("#")
+	win.refresh()
+
+	try:
+		for i in range(0, len(matrix)+2):
+			win.refresh()
+			win.addch("#")
+	except curses.error as e:
+		pass
+
+	win.refresh()
 
 
 def collect_neighbours(matrix, row_index, field_index, x, y):
@@ -36,7 +49,7 @@ def collect_neighbours(matrix, row_index, field_index, x, y):
 
 
 def calculate_turn(matrix, x, y):
-	tmp = [[None for index in range(0, x)] for index in range(0, y)]
+	tmp = [[None for _ in range(0, x)] for _ in range(0, y)]
 	for row_index, row in enumerate(matrix):
 		for field_index, field in enumerate(row):
 			neighbours = collect_neighbours(matrix, row_index, field_index, x, y)
@@ -53,30 +66,87 @@ def insert_5_block(matrix, x, y):
 		print_matrix(matrix)
 
 
-print("enter x:")
-x = int(input())
-print("enter y:")
-y = int(input())
+stdscr = curses.initscr()
+stdscr.clear()
 
-matrix = [[" " for index in range(0, x)] for index in range(0, y)]
-print_matrix(matrix)
-
-insert_5_block(matrix, 10, 7)
-# while True:
-# 	print("enter x:")
-# 	tmpx = input()
-# 	if tmpx == "": break
-# 	tmpx = int(tmpx)
-# 	print("enter y:")
-# 	tmpy = input()
-# 	if tmpy == "": break
-# 	tmpy = int(tmpy)
-# 	matrix[tmpy][tmpx] = "*"
-# 	print_matrix(matrix)
+curses.echo()
+curses.nocbreak()
+stdscr.keypad(False)
 
 while True:
-	sleep(1)
-	os.system("clear")
+	stdscr.addstr("Enter x-length: ")
+	stdscr.refresh()
+	x = stdscr.getstr().decode(encoding="utf-8")
+	if x.isnumeric():
+		x = int(x)
+		break
+
+
+while True:
+	stdscr.addstr("Enter y-length: ")
+	stdscr.refresh()
+	y = stdscr.getstr().decode(encoding="utf-8")
+	if y.isnumeric():
+		y = int(y)
+		break
+
+matrix = [[" " for _ in range(0, x)] for _ in range(0, y)]
+stdscr.clear()
+stdscr.refresh()
+
+win = curses.newwin(y+2, x+2, 0, 0)
+print_matrix(matrix)
+
+curses.noecho()
+curses.cbreak()
+win.keypad(True)
+
+current_y = 0
+current_x = 0
+win.move(current_y, current_x)
+
+while 1:
+	c = win.getch()
+	try:
+		if c == curses.KEY_UP:
+			win.move(current_y - 1, current_x)
+			current_y, current_x = win.getyx()
+		elif c == curses.KEY_DOWN:
+			win.move(current_y + 1, current_x)
+			current_y, current_x = win.getyx()
+		elif c == curses.KEY_LEFT:
+			win.move(current_y, current_x - 1)
+			current_y, current_x = win.getyx()
+		elif c == curses.KEY_RIGHT:
+			win.move(current_y, current_x + 1)
+			current_y, current_x = win.getyx()
+		elif c == ord(" "):
+			if 0 < current_x <= x and 0 < current_y <= y:
+				if matrix[current_y - 1][current_x - 1] == " ":
+					matrix[current_y - 1][current_x - 1] = "*"
+				else:
+					matrix[current_y - 1][current_x - 1] = " "
+				current_y, current_x = win.getyx()
+				win.clear()
+				print_matrix(matrix)
+				win.move(current_y, current_x)
+		elif c == ord("\n"):
+			break
+	except curses.error as e:
+		pass
+
+while True:
+	win.clear()
 	matrix = calculate_turn(matrix, x, y)
-	print()
 	print_matrix(matrix)
+	some_left = False
+	for row in matrix:
+		for field in row:
+			if field == "*": some_left = True
+	if not some_left:
+		break
+	sleep(1)
+
+win.clear()
+stdscr.clear()
+print("\nEveryone is dead!")
