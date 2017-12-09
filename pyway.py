@@ -1,6 +1,5 @@
 import sys
 from time import sleep
-import os
 import curses
 import signal
 
@@ -25,7 +24,7 @@ def print_matrix(matrix):
 		for i in range(0, len(matrix)+2):
 			win.refresh()
 			win.addch("#")
-	except curses.error as e:
+	except curses.error:
 		pass
 
 	win.refresh()
@@ -60,10 +59,44 @@ def calculate_turn(matrix, x, y):
 	return tmp
 
 
-def insert_5_block(matrix, x, y):
-	for i in range(0,5):
-		matrix[y-i][x] = "*"
-		print_matrix(matrix)
+def change_grid(matrix):
+	curses.cbreak()
+	curses.curs_set(1)
+	win.timeout(-1)
+	current_y = 0
+	current_x = 0
+	win.move(current_y, current_x)
+	while True:
+		c = win.getch()
+		try:
+			if c == curses.KEY_UP:
+				win.move(current_y - 1, current_x)
+				current_y, current_x = win.getyx()
+			elif c == curses.KEY_DOWN:
+				win.move(current_y + 1, current_x)
+				current_y, current_x = win.getyx()
+			elif c == curses.KEY_LEFT:
+				win.move(current_y, current_x - 1)
+				current_y, current_x = win.getyx()
+			elif c == curses.KEY_RIGHT:
+				win.move(current_y, current_x + 1)
+				current_y, current_x = win.getyx()
+			elif c == ord(" "):
+				if 0 < current_x <= x and 0 < current_y <= y:
+					if matrix[current_y - 1][current_x - 1] == " ":
+						matrix[current_y - 1][current_x - 1] = "*"
+					else:
+						matrix[current_y - 1][current_x - 1] = " "
+					current_y, current_x = win.getyx()
+					win.clear()
+					print_matrix(matrix)
+					win.move(current_y, current_x)
+			elif c == ord("\n"):
+				break
+		except curses.error:
+			pass
+	curses.nocbreak()
+	curses.curs_set(0)
 
 
 stdscr = curses.initscr()
@@ -98,44 +131,12 @@ win = curses.newwin(y+2, x+2, 0, 0)
 print_matrix(matrix)
 
 curses.noecho()
-curses.cbreak()
 win.keypad(True)
 
-current_y = 0
-current_x = 0
-win.move(current_y, current_x)
-
-while 1:
-	c = win.getch()
-	try:
-		if c == curses.KEY_UP:
-			win.move(current_y - 1, current_x)
-			current_y, current_x = win.getyx()
-		elif c == curses.KEY_DOWN:
-			win.move(current_y + 1, current_x)
-			current_y, current_x = win.getyx()
-		elif c == curses.KEY_LEFT:
-			win.move(current_y, current_x - 1)
-			current_y, current_x = win.getyx()
-		elif c == curses.KEY_RIGHT:
-			win.move(current_y, current_x + 1)
-			current_y, current_x = win.getyx()
-		elif c == ord(" "):
-			if 0 < current_x <= x and 0 < current_y <= y:
-				if matrix[current_y - 1][current_x - 1] == " ":
-					matrix[current_y - 1][current_x - 1] = "*"
-				else:
-					matrix[current_y - 1][current_x - 1] = " "
-				current_y, current_x = win.getyx()
-				win.clear()
-				print_matrix(matrix)
-				win.move(current_y, current_x)
-		elif c == ord("\n"):
-			break
-	except curses.error as e:
-		pass
+change_grid(matrix)
 
 while True:
+	win.timeout(1000)
 	win.clear()
 	matrix = calculate_turn(matrix, x, y)
 	print_matrix(matrix)
@@ -145,8 +146,15 @@ while True:
 			if field == "*": some_left = True
 	if not some_left:
 		break
-	sleep(1)
+	if win.getch() == 10:
+		change_grid(matrix)
 
+
+curses.nocbreak()
 win.clear()
 stdscr.clear()
-print("\nEveryone is dead!")
+stdscr.refresh()
+print("Everyone is dead! (Press any key to exit)")
+stdscr.touchwin()
+stdscr.getch()
+curses.endwin()
